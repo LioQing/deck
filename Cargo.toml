@@ -1,0 +1,9 @@
+[package]
+name = "deck"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitflags = "2.6.0"
+paste = "1.0.15"
+thiserror = "1.0.63"
