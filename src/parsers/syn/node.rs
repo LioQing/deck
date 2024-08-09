@@ -1,20 +1,40 @@
 use crate::Spanned;
+use strum_macros::EnumIs;
 
 /// Syntactic node kind.
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, EnumIs)]
 pub enum SynNodeKind {
     /// Identifier: an identifiers
     Ident(String),
 
     /// Brackets: a node enclosed in brackets
-    Brac {
-        open: char,
-        close: char,
-        children: Vec<SynNode>,
-    },
+    Brac(BracSynNode),
 
     /// Error: an error node
-    Error { msg: String, children: Vec<SynNode> },
+    Err(ErrSynNode),
+}
+
+/// Brackets syntactic node.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct BracSynNode {
+    /// Open bracket.
+    pub open: char,
+
+    /// Close bracket.
+    pub close: char,
+
+    /// Children nodes.
+    pub children: Vec<SynNode>,
+}
+
+/// Error syntactic node.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct ErrSynNode {
+    /// Error message.
+    pub msg: String,
+
+    /// Children nodes.
+    pub children: Vec<SynNode>,
 }
 
 /// Syntactic node.
@@ -34,11 +54,11 @@ impl SynNode {
             SynNodeKind::Ident(ident) => {
                 format!("Ident '{}'", ident)
             }
-            SynNodeKind::Brac {
+            SynNodeKind::Brac(BracSynNode {
                 open,
                 close,
                 children,
-            } => match &children[..] {
+            }) => match &children[..] {
                 [] => format!("Brac '{open}{close}' []"),
                 nodes => format!(
                     "Brac '{open}{close}' [\n{}]",
@@ -49,7 +69,7 @@ impl SynNode {
                         .collect::<String>()
                 ),
             },
-            SynNodeKind::Error { msg, children } => match &children[..] {
+            SynNodeKind::Err(ErrSynNode { msg, children }) => match &children[..] {
                 [] => format!("Error '{msg}' []"),
                 nodes => format!(
                     "Error '{msg}' [\n{}]",
