@@ -1,9 +1,10 @@
-pub trait AdvanceIter {
+/// Extension for advancing an iterator by `n` steps.
+pub trait AdvanceIterExt: Iterator {
     /// Advance the iterator by `n` steps.
     fn advance(&mut self, n: usize);
 }
 
-impl<Iter> AdvanceIter for Iter
+impl<Iter> AdvanceIterExt for Iter
 where
     Iter: Iterator,
 {
@@ -12,9 +13,4 @@ where
             self.next();
         }
     }
-}
-
-pub trait SimpleDisplay {
-    /// Create a simple display string.
-    fn simple_display(&self) -> String;
 }

@@ -1,5 +1,5 @@
-use crate::{EvalIdents, SemNode};
 use crate::parsers::SemNodeExpr;
+use crate::{EvalIdents, SemNode};
 
 /// Definition value.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::{EvalDefValue, EvalIdents, EvalIdentsExtensions, EvalIdentsKind};
 use crate::evaluator::AdvanceSemNodeIterator;
 use crate::parsers::SemNode;
+use crate::{EvalDefValue, EvalIdents, EvalIdentsExtensions, EvalIdentsKind};
 
 /// Definition stack resolution result.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -26,7 +26,10 @@ pub struct EvalStack<'a> {
 
 impl<'a> EvalStack<'a> {
     /// Create a new definition stack.
-    pub fn new<Iter>(iter: Iter) -> Self where Iter: AdvanceSemNodeIterator<'a> + 'a {
+    pub fn new<Iter>(iter: Iter) -> Self
+    where
+        Iter: AdvanceSemNodeIterator<'a> + 'a,
+    {
         Self {
             stack: vec![EvalStackItem {
                 scope: vec![],
@@ -36,7 +39,10 @@ impl<'a> EvalStack<'a> {
     }
 
     /// Push a new scope onto the stack.
-    pub fn push_scope<Iter>(&mut self, iter: Iter) where Iter: AdvanceSemNodeIterator<'a> + 'a {
+    pub fn push_scope<Iter>(&mut self, iter: Iter)
+    where
+        Iter: AdvanceSemNodeIterator<'a> + 'a,
+    {
         self.stack.push(EvalStackItem {
             scope: vec![],
             iter: Box::new(iter),
@@ -62,7 +68,10 @@ impl<'a> EvalStack<'a> {
     }
 
     /// Resolve an identifier.
-    pub fn resolve<'stack>(&'stack self, ident: &EvalIdents) -> Option<EvalStackResolveResult<'a, 'stack>> {
+    pub fn resolve<'stack>(
+        &'stack self,
+        ident: &EvalIdents,
+    ) -> Option<EvalStackResolveResult<'a, 'stack>> {
         if ident.len() == 0 {
             return None;
         }
@@ -102,7 +111,8 @@ impl<'a> std::fmt::Debug for EvalStack<'a> {
 
         f.debug_list()
             .entries(self.stack.iter().map(|x| {
-                x.scope.iter()
+                x.scope
+                    .iter()
                     .map(|(key, value)| KeyValuePair { key, value })
                     .collect::<Vec<_>>()
             }))

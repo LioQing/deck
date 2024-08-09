@@ -41,7 +41,8 @@ fn main() {
     dbg! { mul_2_add_3 1 }
     ";
     input
-        .src_code_iter()
+        .char_indices()
+        .src_code()
         .lexer()
         .parse_syn()
         .parse_sem()

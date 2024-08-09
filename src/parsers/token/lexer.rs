@@ -1,27 +1,29 @@
 use super::*;
-use crate::{utils::AdvanceIter, Span, SrcCodePoint, SynParser};
+use crate::parsers::SrcCode;
+use crate::utils::NextRangePeek;
+use crate::{utils::AdvanceIterExt, Span, SynParser};
 
 /// Lexer.
 #[derive(Debug, Clone)]
-pub struct Lexer<I>
+pub struct Lexer<Iter>
 where
-    I: Iterator<Item = SrcCodePoint> + std::fmt::Debug + Clone + AdvanceIter,
+    Iter: Iterator<Item = SrcCode> + std::fmt::Debug + Clone,
 {
-    iter: I,
+    iter: NextRangePeek<Iter>,
 }
 
-impl<I> Lexer<I>
+impl<Iter> Lexer<Iter>
 where
-    I: Iterator<Item = SrcCodePoint> + std::fmt::Debug + Clone + AdvanceIter,
+    Iter: Iterator<Item = SrcCode> + std::fmt::Debug + Clone,
 {
     /// Create a new lexer.
-    pub fn new(iter: I) -> Self {
+    pub fn new(iter: NextRangePeek<Iter>) -> Self {
         Self { iter }
     }
 
     /// Ignore spaces and newlines.
     pub fn ignore_spaces_and_newlines(self) -> impl Iterator<Item = Token> {
-        self.filter(|t| !matches!(t.value, TokenKind::Spaces | TokenKind::Newlines))
+        self.filter(|t| !t.value.is_spaces() && !t.value.is_newlines())
     }
 
     /// Parse syntax.
@@ -30,68 +32,113 @@ where
     }
 }
 
-impl<I> Iterator for Lexer<I>
+impl<Iter> Iterator for Lexer<Iter>
 where
-    I: Iterator<Item = SrcCodePoint> + std::fmt::Debug + Clone + AdvanceIter,
+    Iter: Iterator<Item = SrcCode> + std::fmt::Debug + Clone,
 {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.iter.next() {
-            Some(point) => Some(match point.ch {
-                ch @ ('(' | '{') => Token {
-                    value: TokenKind::OpenBrac(ch),
-                    span: Span {
-                        start: point,
-                        len: 1,
-                    },
-                },
-                ch @ (')' | '}') => Token {
-                    value: TokenKind::CloseBrac(ch),
-                    span: Span {
-                        start: point,
-                        len: 1,
-                    },
-                },
-                '\n' | '\r' => {
-                    let len = 1 + self
-                        .iter
-                        .clone()
-                        .take_while(|p| ['\n', '\r'].contains(&p.ch))
-                        .count();
-                    self.iter.advance(len - 1);
-                    Token {
-                        value: TokenKind::Newlines,
-                        span: Span { start: point, len },
-                    }
-                }
-                ch if ch.is_whitespace() => {
-                    let len = 1 + self
-                        .iter
-                        .clone()
-                        .take_while(|p| p.ch.is_whitespace())
-                        .count();
-                    self.iter.advance(len - 1);
-                    Token {
-                        value: TokenKind::Spaces,
-                        span: Span { start: point, len },
-                    }
-                }
-                ch => {
-                    let ident = std::iter::once(ch)
-                        .chain(self.iter.clone().map(|p| p.ch).take_while(|c| {
-                            !c.is_whitespace() && !['(', ')', '\r', '\n'].contains(&c)
-                        }))
-                        .collect::<String>();
-                    let len = ident.len();
-                    self.iter.advance(len - 1);
-                    Token {
-                        value: TokenKind::Ident(ident),
-                        span: Span { start: point, len },
-                    }
-                }
-            }),
-            None => None,
-        }
+        None.or_else(|| parse_open_brac(&mut self.iter))
+            .or_else(|| parse_close_brac(&mut self.iter))
+            .or_else(|| parse_newlines(&mut self.iter))
+            .or_else(|| parse_spaces(&mut self.iter))
+            .or_else(|| parse_ident(&mut self.iter))
     }
+}
+
+/// Parse source code into [`TokenKind::OpneBrac`].
+fn parse_open_brac<Iter>(iter: &mut NextRangePeek<Iter>) -> Option<Token>
+where
+    Iter: Iterator<Item = SrcCode>,
+{
+    let token = match iter.peek(1) {
+        [c] if ['(', '{'].contains(&c.value) => Token {
+            value: TokenKind::OpenBrac(c.value),
+            span: c.span.clone(),
+        },
+        _ => return None,
+    };
+
+    iter.advance(1);
+    Some(token)
+}
+
+/// Parse source code into [`TokenKind::CloseBrac`].
+fn parse_close_brac<Iter>(iter: &mut NextRangePeek<Iter>) -> Option<Token>
+where
+    Iter: Iterator<Item = SrcCode>,
+{
+    let token = match iter.peek(1) {
+        [c] if [')', '}'].contains(&c.value) => Token {
+            value: TokenKind::CloseBrac(c.value),
+            span: c.span.clone(),
+        },
+        _ => return None,
+    };
+
+    iter.advance(1);
+    Some(token)
+}
+
+/// Parse source code into [`TokenKind::Newlines`].
+fn parse_newlines<Iter>(iter: &mut NextRangePeek<Iter>) -> Option<Token>
+where
+    Iter: Iterator<Item = SrcCode>,
+{
+    let (token, len) = match iter.peek_while(|c| ['\n', '\r'].contains(&c.value)) {
+        [] => return None,
+        codes @ [c, ..] => (
+            Token {
+                value: TokenKind::Newlines,
+                span: Span::new(c.span.start.clone(), codes.len()),
+            },
+            codes.len(),
+        ),
+    };
+
+    iter.advance(len);
+    Some(token)
+}
+
+/// Parse source code into [`TokenKind::Spaces`].
+fn parse_spaces<Iter>(iter: &mut NextRangePeek<Iter>) -> Option<Token>
+where
+    Iter: Iterator<Item = SrcCode>,
+{
+    let (token, len) = match iter.peek_while(|c| c.value.is_whitespace()) {
+        [] => return None,
+        codes @ [c, ..] => (
+            Token {
+                value: TokenKind::Spaces,
+                span: Span::new(c.span.start.clone(), codes.len()),
+            },
+            codes.len(),
+        ),
+    };
+
+    iter.advance(len);
+    Some(token)
+}
+
+/// Parse source code into [`TokenKind::Ident`].
+fn parse_ident<Iter>(iter: &mut NextRangePeek<Iter>) -> Option<Token>
+where
+    Iter: Iterator<Item = SrcCode>,
+{
+    let (token, len) = match iter.peek_while(|c| {
+        !c.value.is_whitespace() && !['(', ')', '{', '}', '\n', '\r'].contains(&c.value)
+    }) {
+        [] => return None,
+        codes @ [c, ..] => (
+            Token {
+                value: TokenKind::Ident(codes.iter().map(|c| c.value).collect::<String>()),
+                span: Span::new(c.span.start.clone(), codes.len()),
+            },
+            codes.len(),
+        ),
+    };
+
+    iter.advance(len);
+    Some(token)
 }

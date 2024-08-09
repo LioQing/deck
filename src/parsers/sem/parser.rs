@@ -1,5 +1,5 @@
 use super::*;
-use crate::{utils::AdvanceIter, EvalDebugOption, Evaluator, SynNode, SynNodeKind};
+use crate::{utils::AdvanceIterExt, EvalDebugOption, Evaluator, SynNode, SynNodeKind};
 
 /// Semantic parser result.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -12,14 +12,14 @@ pub struct SemParserResult<Item> {
 #[derive(Debug, Clone)]
 pub struct SemParser<Iter>
 where
-    Iter: Iterator<Item = SynNode> + std::fmt::Debug + Clone + AdvanceIter,
+    Iter: Iterator<Item = SynNode> + std::fmt::Debug + Clone + AdvanceIterExt,
 {
     iter: Iter,
 }
 
 impl<Iter> SemParser<Iter>
 where
-    Iter: Iterator<Item = SynNode> + std::fmt::Debug + Clone + AdvanceIter,
+    Iter: Iterator<Item = SynNode> + std::fmt::Debug + Clone + AdvanceIterExt,
 {
     /// Create a new semantic parser.
     pub fn new(iter: Iter) -> Self {
@@ -180,7 +180,7 @@ where
 
 impl<Iter> Iterator for SemParser<Iter>
 where
-    Iter: Iterator<Item = SynNode> + std::fmt::Debug + Clone + AdvanceIter,
+    Iter: Iterator<Item = SynNode> + std::fmt::Debug + Clone + AdvanceIterExt,
 {
     type Item = SemNode;
 

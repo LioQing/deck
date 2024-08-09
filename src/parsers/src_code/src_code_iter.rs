@@ -1,4 +1,5 @@
 use super::*;
+use crate::utils::NextRangePeekExt;
 use crate::Lexer;
 
 /// Source code iterator.
@@ -21,18 +22,17 @@ impl<'a> SrcCodeIter<'a> {
 
     /// Create a lexer.
     pub fn lexer(self) -> Lexer<Self> {
-        Lexer::new(self)
+        Lexer::new(self.next_range_peek())
     }
 }
 
 impl<'a> Iterator for SrcCodeIter<'a> {
-    type Item = SrcCodePoint;
+    type Item = SrcCode;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.iter.next() {
             Some((idx, ch)) => {
-                let info = SrcCodePoint {
-                    ch,
+                let pos = SpanPos {
                     line: self.curr_line,
                     col: self.curr_col,
                     idx,
@@ -45,20 +45,23 @@ impl<'a> Iterator for SrcCodeIter<'a> {
                     self.curr_col += 1;
                 }
 
-                Some(info)
+                Some(SrcCode {
+                    value: ch,
+                    span: Span::new(pos, 1),
+                })
             }
             None => None,
         }
     }
 }
 
-/// Source code iterator trait.
-pub trait SrcCodeIterTrait<'a> {
-    fn src_code_iter(&self) -> SrcCodeIter<'a>;
+/// Source code iterator extension.
+pub trait SrcCodeIterExt<'a> {
+    fn src_code(self) -> SrcCodeIter<'a>;
 }
 
-impl<'a> SrcCodeIterTrait<'a> for &'a str {
-    fn src_code_iter(&self) -> SrcCodeIter<'a> {
-        SrcCodeIter::new(self.char_indices())
+impl<'a> SrcCodeIterExt<'a> for std::str::CharIndices<'a> {
+    fn src_code(self) -> SrcCodeIter<'a> {
+        SrcCodeIter::new(self)
     }
 }

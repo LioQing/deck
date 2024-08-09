@@ -1,12 +1,18 @@
-use std::collections::HashMap;
 use crate::{
-    AdvanceIter, EvalDefValue, EvalIdents, EvalIdentsExtensions, EvalIdentsKind, EvalStack,
+    AdvanceIterExt, EvalDefValue, EvalIdents, EvalIdentsExtensions, EvalIdentsKind, EvalStack,
     EvalStackResolveResult, SemNode, SemNodeExpr, SemNodeExprKind, SemNodeKind, SimpleDisplay,
 };
+use std::collections::HashMap;
 
 /// Semantic node iterator traits.
-pub trait AdvanceSemNodeIterator<'a>: Iterator<Item = &'a SemNode> + std::fmt::Debug + AdvanceIter {}
-impl<'a, T: Iterator<Item = &'a SemNode> + std::fmt::Debug + AdvanceIter> AdvanceSemNodeIterator<'a> for T {}
+pub trait AdvanceSemNodeIterator<'a>:
+    Iterator<Item = &'a SemNode> + std::fmt::Debug + AdvanceIterExt
+{
+}
+impl<'a, T: Iterator<Item = &'a SemNode> + std::fmt::Debug + AdvanceIterExt>
+    AdvanceSemNodeIterator<'a> for T
+{
+}
 
 /// Evaluate identifiers option.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -36,7 +42,10 @@ pub struct Evaluator<'a> {
 
 impl<'a> Evaluator<'a> {
     /// Create a new evaluator.
-    pub fn new<Iter>(iter: Iter) -> Self where Iter: AdvanceSemNodeIterator<'a> + 'a {
+    pub fn new<Iter>(iter: Iter) -> Self
+    where
+        Iter: AdvanceSemNodeIterator<'a> + 'a,
+    {
         Self {
             stack: EvalStack::new(iter),
             debug_options: EvalDebugOption::NONE,
@@ -46,7 +55,7 @@ impl<'a> Evaluator<'a> {
     /// Create a new evaluator with debug options.
     pub fn new_with_debug<Iter>(iter: Iter, debug_options: EvalDebugOption) -> Self
     where
-        Iter: AdvanceSemNodeIterator<'a> + 'a
+        Iter: AdvanceSemNodeIterator<'a> + 'a,
     {
         Self {
             stack: EvalStack::new(iter),
@@ -79,13 +88,19 @@ impl<'a> Evaluator<'a> {
                         }
 
                         match self.eval_exprs(&idents, false) {
-                            Some(EvalDefValue::Ref(_)) => result.push(EvalIdentsKind::Expr(unwrap_idents(idents))),
+                            Some(EvalDefValue::Ref(_)) => {
+                                result.push(EvalIdentsKind::Expr(unwrap_idents(idents)))
+                            }
                             None => result.push(EvalIdentsKind::Param(unwrap_idents(idents))),
                             Some(value) => panic!("unexpected definition: {:?}", value), // Likely unreachable
                         }
                     }
-                    EvalIdentsIdentOption::AlwaysExpr => result.push(EvalIdentsKind::Expr(ident.clone())),
-                    EvalIdentsIdentOption::AlwaysParam => result.push(EvalIdentsKind::Param(ident.clone())),
+                    EvalIdentsIdentOption::AlwaysExpr => {
+                        result.push(EvalIdentsKind::Expr(ident.clone()))
+                    }
+                    EvalIdentsIdentOption::AlwaysParam => {
+                        result.push(EvalIdentsKind::Param(ident.clone()))
+                    }
                 },
                 SemNodeExpr {
                     value: SemNodeExprKind::Inner(inner),
@@ -123,32 +138,34 @@ impl<'a> Evaluator<'a> {
 
         while let Some(EvalStackResolveResult { key, value, args }) = self.stack.resolve(curr) {
             match value {
-                EvalDefValue::Base => return match args.len() {
-                    0 => Some(EvalDefValue::Ref(curr.clone())),
-                    _ => {
-                        let key_cloned = key.clone();
-                        let mut eval_args = HashMap::new();
-                        for (param, arg) in args.into_iter() {
-                            eval_args.insert(
-                                param,
-                                EvalIdentsKind::Inner({
-                                    let arg_idents = match arg {
-                                        EvalIdentsKind::Inner(inner) => inner,
-                                        _ => vec![arg],
-                                    };
+                EvalDefValue::Base => {
+                    return match args.len() {
+                        0 => Some(EvalDefValue::Ref(curr.clone())),
+                        _ => {
+                            let key_cloned = key.clone();
+                            let mut eval_args = HashMap::new();
+                            for (param, arg) in args.into_iter() {
+                                eval_args.insert(
+                                    param,
+                                    EvalIdentsKind::Inner({
+                                        let arg_idents = match arg {
+                                            EvalIdentsKind::Inner(inner) => inner,
+                                            _ => vec![arg],
+                                        };
 
-                                    match self.eval_exprs(&arg_idents, false) {
-                                        Some(EvalDefValue::Ref(idents)) => idents,
-                                        Some(EvalDefValue::Expanded(idents)) => idents,
-                                        _ => panic!("argument not found: {:?}", arg_idents),
-                                    }
-                                }),
-                            );
+                                        match self.eval_exprs(&arg_idents, false) {
+                                            Some(EvalDefValue::Ref(idents)) => idents,
+                                            Some(EvalDefValue::Expanded(idents)) => idents,
+                                            _ => panic!("argument not found: {:?}", arg_idents),
+                                        }
+                                    }),
+                                );
+                            }
+                            let expanded = key_cloned.assign_params(&eval_args);
+                            Some(EvalDefValue::Expanded(expanded))
                         }
-                        let expanded = key_cloned.assign_params(&eval_args);
-                        Some(EvalDefValue::Expanded(expanded))
                     }
-                },
+                }
                 EvalDefValue::Ref(next) | EvalDefValue::Expanded(next) => {
                     if debug {
                         println!("{}", next.simple_display());
@@ -163,7 +180,10 @@ impl<'a> Evaluator<'a> {
                     self.stack.push_scope(iter.clone());
 
                     for (param, arg) in args {
-                        self.stack.push_def(vec![EvalIdentsKind::Expr(param)], EvalDefValue::Ref(vec![arg]));
+                        self.stack.push_def(
+                            vec![EvalIdentsKind::Expr(param)],
+                            EvalDefValue::Ref(vec![arg]),
+                        );
                     }
 
                     self.for_each(|_| ());
@@ -177,8 +197,10 @@ impl<'a> Evaluator<'a> {
 
                     if debug {
                         match &def_value {
-                            EvalDefValue::Ref(idents) | EvalDefValue::Expanded(idents) => println!("{}", idents.simple_display()),
-                            _ => panic!("unexpected definition: {:?}", def_value)
+                            EvalDefValue::Ref(idents) | EvalDefValue::Expanded(idents) => {
+                                println!("{}", idents.simple_display())
+                            }
+                            _ => panic!("unexpected definition: {:?}", def_value),
                         }
                     }
 
@@ -204,7 +226,12 @@ impl<'a> Evaluator<'a> {
 
         match node {
             SemNode {
-                value: SemNodeKind::Def { idents, body, exprs },
+                value:
+                    SemNodeKind::Def {
+                        idents,
+                        body,
+                        exprs,
+                    },
                 ..
             } => {
                 if idents.is_empty() {
@@ -221,8 +248,10 @@ impl<'a> Evaluator<'a> {
                         panic!("definition with a body must have expressions");
                     }
 
-                    let def_idents = self.eval_idents(idents, EvalIdentsIdentOption::ResolveWithStack);
-                    self.stack.push_def(def_idents, EvalDefValue::Node { body, exprs });
+                    let def_idents =
+                        self.eval_idents(idents, EvalIdentsIdentOption::ResolveWithStack);
+                    self.stack
+                        .push_def(def_idents, EvalDefValue::Node { body, exprs });
                 } else {
                     let exprs_idents = self.eval_idents(exprs, EvalIdentsIdentOption::AlwaysExpr);
                     let def_value = self
@@ -266,15 +295,13 @@ impl<'a> Iterator for Evaluator<'a> {
 impl SimpleDisplay for EvalIdents {
     fn simple_display(&self) -> String {
         self.iter()
-            .map(|ident|
-            match ident {
+            .map(|ident| match ident {
                 EvalIdentsKind::Expr(ident) => ident.clone(),
                 EvalIdentsKind::Inner(inner) => {
                     format!("({})", inner.simple_display())
-                },
+                }
                 _ => panic!("cannot print parameter: {:?}", ident),
-            }
-            )
+            })
             .collect::<Vec<String>>()
             .join(" ")
     }

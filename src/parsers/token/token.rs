@@ -1,7 +1,9 @@
+use crate::utils::SimpleDisplay;
 use crate::Spanned;
+use strum_macros::EnumIs;
 
 /// Token kinds.
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, EnumIs)]
 pub enum TokenKind {
     /** Open bracket */
     OpenBrac(char),
@@ -21,3 +23,9 @@ pub enum TokenKind {
 
 /// Token.
 pub type Token = Spanned<TokenKind>;
+
+impl SimpleDisplay for Token {
+    fn simple_display(&self) -> String {
+        format!("{:?}", self.value)
+    }
+}
