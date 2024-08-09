@@ -7,14 +7,14 @@ use crate::{utils::AdvanceIterExt, Span, SynParser};
 #[derive(Debug, Clone)]
 pub struct Lexer<Iter>
 where
-    Iter: Iterator<Item = SrcCode> + std::fmt::Debug + Clone,
+    Iter: Iterator<Item = SrcCode>,
 {
     iter: NextRangePeek<Iter>,
 }
 
 impl<Iter> Lexer<Iter>
 where
-    Iter: Iterator<Item = SrcCode> + std::fmt::Debug + Clone,
+    Iter: Iterator<Item = SrcCode>,
 {
     /// Create a new lexer.
     pub fn new(iter: NextRangePeek<Iter>) -> Self {
@@ -34,7 +34,7 @@ where
 
 impl<Iter> Iterator for Lexer<Iter>
 where
-    Iter: Iterator<Item = SrcCode> + std::fmt::Debug + Clone,
+    Iter: Iterator<Item = SrcCode>,
 {
     type Item = Token;
 
