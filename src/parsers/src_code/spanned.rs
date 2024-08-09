@@ -46,4 +46,15 @@ impl<T> Spanned<T> {
             span: self.span,
         }
     }
+
+    /// Map the span.
+    pub fn map_span<F>(self, f: F) -> Spanned<T>
+    where
+        F: FnOnce(Span) -> Span,
+    {
+        Spanned {
+            value: self.value,
+            span: f(self.span),
+        }
+    }
 }

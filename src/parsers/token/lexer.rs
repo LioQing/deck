@@ -1,7 +1,7 @@
 use super::*;
 use crate::parsers::SrcCode;
 use crate::utils::NextRangePeek;
-use crate::{utils::AdvanceIterExt, Span, SynParser};
+use crate::{Span, SynParser};
 
 /// Lexer.
 #[derive(Debug, Clone)]
@@ -52,16 +52,12 @@ fn parse_open_brac<Iter>(iter: &mut NextRangePeek<Iter>) -> Option<Token>
 where
     Iter: Iterator<Item = SrcCode>,
 {
-    let token = match iter.peek(1) {
-        [c] if ['(', '{'].contains(&c.value) => Token {
-            value: TokenKind::OpenBrac(c.value),
-            span: c.span.clone(),
-        },
-        _ => return None,
-    };
-
-    iter.advance(1);
-    Some(token)
+    match iter.peek(1) {
+        [c] if ['(', '{'].contains(&c.value) => {
+            iter.next().map(|c| c.map(|ch| TokenKind::OpenBrac(ch)))
+        }
+        _ => None,
+    }
 }
 
 /// Parse source code into [`TokenKind::CloseBrac`].
@@ -69,16 +65,12 @@ fn parse_close_brac<Iter>(iter: &mut NextRangePeek<Iter>) -> Option<Token>
 where
     Iter: Iterator<Item = SrcCode>,
 {
-    let token = match iter.peek(1) {
-        [c] if [')', '}'].contains(&c.value) => Token {
-            value: TokenKind::CloseBrac(c.value),
-            span: c.span.clone(),
-        },
-        _ => return None,
-    };
-
-    iter.advance(1);
-    Some(token)
+    match iter.peek(1) {
+        [c] if [')', '}'].contains(&c.value) => {
+            iter.next().map(|c| c.map(|ch| TokenKind::CloseBrac(ch)))
+        }
+        _ => None,
+    }
 }
 
 /// Parse source code into [`TokenKind::Newlines`].
@@ -86,19 +78,22 @@ fn parse_newlines<Iter>(iter: &mut NextRangePeek<Iter>) -> Option<Token>
 where
     Iter: Iterator<Item = SrcCode>,
 {
-    let (token, len) = match iter.peek_while(|c| ['\n', '\r'].contains(&c.value)) {
-        [] => return None,
-        codes @ [c, ..] => (
-            Token {
-                value: TokenKind::Newlines,
-                span: Span::new(c.span.start.clone(), codes.len()),
-            },
-            codes.len(),
-        ),
-    };
+    match iter.peek_while(|c| ['\n', '\r'].contains(&c.value)) {
+        [] => None,
+        codes => {
+            let len = codes.len();
+            let first = iter.next().unwrap();
+            for _ in 1..len {
+                iter.next();
+            }
 
-    iter.advance(len);
-    Some(token)
+            Some(
+                first
+                    .map(|_| TokenKind::Newlines)
+                    .map_span(|span| Span::new(span.start, len)),
+            )
+        }
+    }
 }
 
 /// Parse source code into [`TokenKind::Spaces`].
@@ -106,19 +101,22 @@ fn parse_spaces<Iter>(iter: &mut NextRangePeek<Iter>) -> Option<Token>
 where
     Iter: Iterator<Item = SrcCode>,
 {
-    let (token, len) = match iter.peek_while(|c| c.value.is_whitespace()) {
-        [] => return None,
-        codes @ [c, ..] => (
-            Token {
-                value: TokenKind::Spaces,
-                span: Span::new(c.span.start.clone(), codes.len()),
-            },
-            codes.len(),
-        ),
-    };
+    match iter.peek_while(|c| c.value.is_whitespace()) {
+        [] => None,
+        codes => {
+            let len = codes.len();
+            let first = iter.next().unwrap();
+            for _ in 1..len {
+                iter.next();
+            }
 
-    iter.advance(len);
-    Some(token)
+            Some(
+                first
+                    .map(|_| TokenKind::Spaces)
+                    .map_span(|span| Span::new(span.start, len)),
+            )
+        }
+    }
 }
 
 /// Parse source code into [`TokenKind::Ident`].
@@ -126,19 +124,26 @@ fn parse_ident<Iter>(iter: &mut NextRangePeek<Iter>) -> Option<Token>
 where
     Iter: Iterator<Item = SrcCode>,
 {
-    let (token, len) = match iter.peek_while(|c| {
+    match iter.peek_while(|c| {
         !c.value.is_whitespace() && !['(', ')', '{', '}', '\n', '\r'].contains(&c.value)
     }) {
-        [] => return None,
-        codes @ [c, ..] => (
-            Token {
-                value: TokenKind::Ident(codes.iter().map(|c| c.value).collect::<String>()),
-                span: Span::new(c.span.start.clone(), codes.len()),
-            },
-            codes.len(),
-        ),
-    };
+        [] => None,
+        codes => {
+            let len = codes.len();
+            let mut ident = String::with_capacity(len);
 
-    iter.advance(len);
-    Some(token)
+            let first = iter.next().unwrap();
+            ident.push(first.value);
+            for _ in 1..len {
+                let code = iter.next().unwrap();
+                ident.push(code.value);
+            }
+
+            Some(
+                first
+                    .map(|_| TokenKind::Ident(ident))
+                    .map_span(|span| Span::new(span.start, len)),
+            )
+        }
+    }
 }
